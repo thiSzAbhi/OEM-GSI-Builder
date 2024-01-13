@@ -36,7 +36,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt upgrade -y
-          sudo apt install python3 python-pip -y
+          sudo apt install python3 -y
           git clone --recurse-submodules "${{ steps.config.outputs.tool_repo }}"
           bash ErfanGSIs/setup.sh
           sed -i '$d' ErfanGSIs/url2GSI.sh
