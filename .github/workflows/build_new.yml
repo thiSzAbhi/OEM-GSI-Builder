@@ -135,6 +135,12 @@ jobs:
                 echo "Firmware not found!"
                 exit 1
              fi
+             if [ -f *.tar.md5 ]; then
+                tar --extract --file *AP*.tar.md5
+                rm -rf *.tar.md5
+                unlz4 --multiple --verbose super*.lz4
+                rm -rf super*.lz4
+             fi
              sudo find . -type f -name "super.img" -exec mv {} /home/OEMGSI/tempsuper \;
              sudo rm -rf *
              cd /home/OEMGSI/tempsuper
