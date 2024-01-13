@@ -1,4 +1,4 @@
-# Renewed OEM GSÏ Builder
+# Renewed OEM GSI Builder
 
 Port OEM ROMs to project treble using github actions and [ErfanGSIs](https://github.com/erfanoabdi/ErfanGSIs) then upload to sourceforge.
 
