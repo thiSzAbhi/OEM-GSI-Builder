@@ -101,7 +101,7 @@ jobs:
           mkdir temp
           mkdir tempsuper
           cd $TL
-          if [ "${{{ env.DYN }}" == "Dynamic" ]; then
+          if [ "${{ env.DYN }}" == "Dynamic" ]; then
              cd /home/OEMGSI/temp
              wget ${{ env.URL }}
              if [ -f *.zip ]; then
