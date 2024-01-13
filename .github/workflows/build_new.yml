@@ -1,0 +1,185 @@
+name: Renovated OEM GSI Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      FIRMWARE_URL:
+        description: 'Firmware URL'
+        required: true
+        default: ''
+      TARGET_ARCH:
+        description: 'Build type (A-Only or A/B)'
+        required: true
+        default: ''
+        type: choice
+        options:
+        - ab
+        - a
+      GSI_TARGET:
+        description: 'The stock ROM distribution you are using'
+        required: true
+        default: ''
+        type: choice
+        options:
+        - Generic
+        - MIUI
+        - OneUI
+        - OxygenOS
+        - Flyme
+        - Pixel
+        - ColorOS
+        - Moto
+        - Nubia
+        - Xperia
+        - ZUI
+        - ZenUI
+      TARGET_DYNAMIC_PARTITIONS:
+        description: 'Partition type (Dynamic or not)'
+        required: true
+        default: ''
+        type: choice
+        options:
+        - Dynamic
+        - Normal
+      USE_CUSTOM_TOOL:
+        description: 'Custom GSI tool URL (Git)'
+        required: false
+        default: ''
+      USER_NAME:
+        description: 'GitHub user name'
+        required: true
+        default: ''
+      USER_EMAIL:
+        description: 'GitHub user e-mail'
+        required: true
+        default: ''
+      EXTRA_PARAMETERS: 
+        description: 'Extra GSI Tool parameters'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GTOKEN }}
+      URL: ${{ github.event.inputs.FIRMWARE_URL }}
+      TA: ${{ github.event.inputs.TARGET_ARCH }}
+      GT: ${{ github.event.inputs.GSI_TARGET }}
+      DYN: ${{ github.event.inputs.TARGET_DYNAMIC_PARTITIONS }}
+      UCT: ${{ github.event.inputs.USE_CUSTOM_TOOL }}
+      UN: ${{ github.event.inputs.USER_NAME }}
+      UE: ${{ github.event.inputs.USER_EMAIL }}
+      EP: ${{ github.event.inputs.EXTRA_PARAMETERS }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup environment and GSI tool
+        run: |
+          cd /home
+          sudo mkdir OEMGSI
+          sudo chmod 777 OEMGSI
+          cd OEMGSI
+          if [ "${{ env.UCT }}" == "" ]; then
+             git clone --recurse-submodules https://github.com/erfanoabdi/ErfanGSIs
+             TL="ErfanGSIs"
+          else
+             git clone --recurse-submodules ${{ env.URL }} ./ModdedTool
+             TL="ModdedTool"
+          fi
+          sudo chmod -R 777 $TL/
+          bash $TL/setup.sh
+          sudo apt install xz-utils python3 gzip curl jq -y
+
+      - name: Generate GSI image
+        run: |
+          cd /home/OEMGSI
+          mkdir GSIFiles
+          mkdir temp
+          mkdir tempsuper
+          cd $TL
+          if [ "${{{ env.DYN }}" == "Dynamic" ]; then
+             cd /home/OEMGSI/temp
+             wget ${{ env.URL }}
+             if [ -f *.zip ]; then
+                unzip *.zip
+                rm -rf *.zip
+             elif [ -f *.7z ]; then
+                7za x *.7z
+                rm -rf *.7z
+             elif [ -f *.7zip ]; then
+                7za x *.7zip
+                rm -rf *.7zip
+             elif [ -f *.tgz ]; then
+                tar zxvf *.tgz
+                rm -rf *.tgz
+             elif [ -f *.tar.gz ]; then
+                tar zxvf *.tar.gz
+                rm -rf *.tar.gz
+             elif [ -f *.tar ]; then
+                tar -xvf *.tar
+                rm -rf *.tar
+             elif [ -f *.tar.xz ]; then
+                tar -xf *.tar.xz
+                rm -rf *.tar.xz
+             elif [ -f *.xz ]; then
+                xz -d -f *.xz
+                rm -rf *.xz
+             elif [ -f *.rar ]; then
+                unrar *.rar
+                rm -rf *.rar
+             else
+                echo "Firmware not found!"
+                exit 1
+             fi
+             sudo find . -type f -name "super.img" -exec mv {} /home/OEMGSI/tempsuper \;
+             sudo rm -rf *
+             cd /home/OEMGSI/tempsuper
+             wget https://github.com/YZBruh/transsion-mt6789-CK7n-recovery_stock_rom/raw/master/lpunpack/lpunpack.py
+             sudo chmod 777 lpunpack.py
+             python3 lpunpack.py super.img tmpsuper
+             rm -rf *.img
+             mv tempsuper/system*.img /home/tempsuper
+             tar -czvf extrfirm.tgz *.img
+             response=$(curl -X POST -H "Authorization: token ${{ secrets.GTOKEN }}" -d '{"tag_name": "tempx", "name": "temp", "draft": false, "prerelease": false}' "https://api.github.com/repos/${{ env.UN }}/OEM-GSI-Builder/releases")
+             browser_download_url=$(echo $response | jq -r '.upload_url' | sed -e 's/{?name,label}//')
+             browser_download_url="${browser_download_url}?name=file.zip"
+             curl -X POST -H "Authorization: token ${{ secrets.GTOKEN }}" -H "Content-Type: application/zip" --data-binary @extrfirm.tgz "$browser_download_url"
+             cd /home/OEMGSI
+             rm -rf tem*
+             cd $TL
+             ./url2GSI.sh https://github.com/"${{ env.UN }}"/OEM-GSI-Builder/releases/download/tempx/extrfirm.tgz
+             curl -X DELETE -u ${{ env.UN}}:${{ env.GTOKEN }} "https://api.github.com/repos/"${{ env.UN }}"/OEM-GSI-Builder/releases/tags/tempx"
+             mv output/*.img /home/OEMGSI/GSIFiles
+             xz -9 -T0 -v -z /home/OEMGSI/GSIFiles/*.img
+             mv output/*.txt /home/OEMGSI/GSIFiles
+             cd /home/OEMGSI
+             rm -rf $TL
+          else
+             ./url2GSI ${{ env.URL }} ${{ env.GT }} --"${{ env.TA }}" ${{ env.EP }}
+             mv output/*.img /home/OEMGSI/GSIFiles
+             xz -9 -T0 -v -z /home/OEMGSI/GSIFiles/*.img
+             mv output/*.txt /home/OEMGSI/GSIFiles
+             cd /home/OEMGSI
+             rm -rf $TL
+          fi
+
+      - name: Upload GSI image
+        uses: softprops/action-gh-release@v1
+        with:
+          files: | 
+            /home/OEMGSI/GSIFiles/*.xz
+            /home/OEMGSI/GSIFiles/*.txt
+          name: GSI Port ${{ env.GT }} ${{ github.run_id }}
+          tag_name: ${{ github.run_id }}
+          body: |
+            --GSI Port--
+            Target ROM: ${{ env.GT }}
+            Partition type (ROM): ${{ env.TA }}
+            Partition style (ROM): ${{ env.DYN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GTOKEN }}
+             
