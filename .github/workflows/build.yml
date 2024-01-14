@@ -32,7 +32,7 @@ jobs:
       - name: Setup ErfanGSIs Tools
         run: |
           sudo apt update
-          git clone --recurse-submodules "${{ steps.config.outputs.tool_repo }}"
+          git clone --recurse-submodules https://github.com/YZBruh/ErfanGSIs
           bash ErfanGSIs/setup.sh
           sed -i '$d' ErfanGSIs/url2GSI.sh
           
