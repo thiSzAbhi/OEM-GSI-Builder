@@ -31,7 +31,7 @@ jobs:
           
       - name: Setup ErfanGSIs Tools
         run: |
-          sudo apt update
+          sudo apt update && sudo apt install xz-utils
           git clone --recurse-submodules https://github.com/YZBruh/ErfanGSIs
           bash ErfanGSIs/setup.sh
           sed -i '$d' ErfanGSIs/url2GSI.sh
@@ -55,15 +55,18 @@ jobs:
         run: |
           mkdir build/
           sudo mv ErfanGSIs/output/*.img build/
-          gzip -r build/
+          curdir=$(pwd)
+          cd build
+          xz *.img
+          cd $curdir
           sudo mv ErfanGSIs/output/*.txt build/
           
       - name: Upload
         uses: softprops/action-gh-release@v1
         with:
            files: | 
-             build/*.gz
-           name: GSI-${{ github.run_id }}
+             build/*.xz
+           name: GSI-${{ steps.config.outputs.firmware_type }}-${{ github.run_id }}
            tag_name: ${{ github.run_id }}
            body: |
              GSI
